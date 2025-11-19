@@ -19,6 +19,10 @@ void setup() {
   Serial.println("test pwm");
 
   // arming sequence
+  Serial.println("Manually setting to 0");
+  pinMode(ESC_PIN, OUTPUT);
+  digitalWrite(ESC_PIN, LOW);
+  delay(1000);
   esc.attach(ESC_PIN, MIN_THROTTLE, MAX_THROTTLE);
 
   Serial.println("Sending neutral signal to arm ESC...");
