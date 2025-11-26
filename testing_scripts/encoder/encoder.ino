@@ -1,8 +1,8 @@
 #include <Encoder.h>
 
 // Pins
-const int ENCODER_PIN_A = 22;
-const int ENCODER_PIN_B = 24;
+const int ENCODER_PIN_A = 2;
+const int ENCODER_PIN_B = 3;
 
 Encoder encoderWheel(ENCODER_PIN_A, ENCODER_PIN_B);
 
