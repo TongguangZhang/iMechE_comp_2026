@@ -31,12 +31,14 @@ const int MAX_ENCODER_COUNT = 1000;
 const int MIN_ENCODER_COUNT = 0;
 
 // pid constants
-const float SLOWDOWN_THRESHOLD = 0.5;
+const float SLOWDOWN_THRESHOLD = 0.2;
 const int SLOWDOWN_THRESHOLD_FORWARD = MAX_ENCODER_COUNT * SLOWDOWN_THRESHOLD;
 const int SLOWDOWN_THRESHOLD_REVERSE = MIN_ENCODER_COUNT + (MAX_ENCODER_COUNT - MIN_ENCODER_COUNT) * (1 - SLOWDOWN_THRESHOLD);
 const int MIN_SPEED = (MAX_THROTTLE - NEUTRAL_THROTTLE) * 0.1; // 10% of max speed
 const int MIN_FORWARD_SPEED = NEUTRAL_THROTTLE + MIN_SPEED;
 const int MIN_REVERSE_SPEED = NEUTRAL_THROTTLE - MIN_SPEED; 
+const int MAX_FORWARD_SPEED = NEUTRAL_THROTTLE + 100;
+const int MAX_REVERSE_SPEED = NEUTRAL_THROTTLE - 100;
 
 Encoder encoder_wheel(ENCODER_PIN_A, ENCODER_PIN_B);
 Servo esc;
@@ -67,12 +69,11 @@ void setup() {
 }
 
 bool reached_top = false;
+int count = 0;
 
 void loop() {
   // read encoder value
   long pos = encoder_wheel.read();
-  Serial.print("Encoder count: ");
-  Serial.println(pos);
 
   const Direction direction = reached_top ? Direction::REVERSE : Direction::FORWARD;
   if (pos >= MAX_ENCODER_COUNT) {
@@ -82,10 +83,16 @@ void loop() {
   }
   // do the math and write to esc
   int pwm = encoder_count_to_pwm_pid(pos, direction);
-  Serial.print("mapped pwm value: ");
-  Serial.println(pwm);
   esc.writeMicroseconds(pwm);
-  delay(1000);
+  delay(20);
+
+  count++;
+  if (count % 100 == 0) {
+    Serial.print("Encoder count: ");
+    Serial.println(pos);
+    Serial.print("mapped pwm value: ");
+    Serial.println(pwm);
+  }
 }
 
 // arms esc
@@ -105,20 +112,20 @@ void esc_arming_sequence() {
 int encoder_count_to_pwm_pid(int encoder_count, Direction direction) {
   if (direction == Direction::FORWARD) {
     if (encoder_count < SLOWDOWN_THRESHOLD_FORWARD) {
-      return MAX_THROTTLE;
+      return MAX_FORWARD_SPEED;
     }
 
-    int pwm = map(encoder_count, SLOWDOWN_THRESHOLD_FORWARD, MAX_ENCODER_COUNT, MAX_THROTTLE, MIN_FORWARD_SPEED);
-    return constrain(pwm, MIN_FORWARD_SPEED, MAX_THROTTLE);
+    int pwm = map(encoder_count, SLOWDOWN_THRESHOLD_FORWARD, MAX_ENCODER_COUNT, MAX_FORWARD_SPEED, MIN_FORWARD_SPEED);
+    return constrain(pwm, MIN_FORWARD_SPEED, MAX_FORWARD_SPEED);
   }
 
   if (direction == Direction::REVERSE) {
     if (encoder_count > SLOWDOWN_THRESHOLD_REVERSE) {
-      return MIN_THROTTLE;
+      return MAX_REVERSE_SPEED;
     }
 
-    int pwm = map(encoder_count, SLOWDOWN_THRESHOLD_REVERSE, MIN_ENCODER_COUNT, MIN_THROTTLE, MIN_REVERSE_SPEED);
-    return constrain(pwm, MIN_THROTTLE, MIN_REVERSE_SPEED);
+    int pwm = map(encoder_count, SLOWDOWN_THRESHOLD_REVERSE, MIN_ENCODER_COUNT, MAX_REVERSE_SPEED, MIN_REVERSE_SPEED);
+    return constrain(pwm, MAX_REVERSE_SPEED, MIN_REVERSE_SPEED);
   }
 
   return NEUTRAL_THROTTLE;
