@@ -106,14 +106,22 @@ void setup() {
   Serial.println("Main system start");
 
   pinMode(START_BUTTON_PIN, INPUT_PULLUP);
-
   pinMode(TOP_LIMIT_SWITCH_PIN, INPUT_PULLUP);
+  Serial.println("Button pins initialized");
 
   esc_arming_sequence();
   Serial.println(">>> ESC arming complete <<<");
 
   encoder_wheel.write(MIN_ENCODER_COUNT);
   Serial.println("Encoder reset to 0");
+
+  pinMode(BUZZER_PIN, OUTPUT);
+  Serial.println("Buzzer pin initialized");
+
+  pixels.begin();
+  pixels.setBrightness(10);
+  pixels.show();
+  Serial.println("Neopixel initialization");
 }
 
 unsigned long time_of_last_state_change = 0;
@@ -308,6 +316,72 @@ void determine_state(bool start_button_pressed, bool top_limit_switch_triggered,
     case State::END: {
       Serial.println(">>> Current State: END <<<");
       Serial.println(">>> Staying in state: END <<<");
+      break;
+    }
+    case default: {
+      Serial.println("Error: Unknown state");
+      break;
+    }
+  }
+}
+
+// Based on the current state, perform the appropriate actions for the actuators
+void action_at_state(long encoder_count) {
+  switch (current_state) {
+    case State::START: {
+      set_esc_speed(encoder_count, MIN_ENCODER_COUNT, Direction::STOP);
+      buzzer_state(false);
+      neopixel_state(false, false);
+      chain_servo_state(false);
+      break;
+    }
+    case State::CLIMB_TO_TOP: {
+      set_esc_speed(encoder_count, TOP_ENCODER_COUNT, Direction::FORWARD);
+      buzzer_state(false);
+      neopixel_state(false, true); // green on
+      chain_servo_state(false);
+      break;
+    }
+    case State::STOP_AT_TOP: {
+      set_esc_speed(encoder_count, TOP_ENCODER_COUNT, Direction::STOP);
+      buzzer_state(true);
+      neopixel_state(true, false); // red on
+      chain_servo_state(false);
+      break;
+    }
+    case State::RETURN_TO_BOTTOM: {
+      set_esc_speed(encoder_count, MIN_ENCODER_COUNT, Direction::REVERSE);
+      buzzer_state(false);
+      neopixel_state(false, true); // green on
+      chain_servo_state(false);
+      break;
+    }
+    case State::STOP_AT_BOTTOM: {
+      set_esc_speed(encoder_count, MIN_ENCODER_COUNT, Direction::STOP);
+      buzzer_state(true);
+      neopixel_state(true, false); // red on
+      chain_servo_state(false);
+      break;
+    }
+    case State::CLIMB_TO_INTERMEDIATE: {
+      set_esc_speed(encoder_count, INTERMEDIATE_ENCODER_COUNT, Direction::FORWARD);
+      buzzer_state(false);
+      neopixel_state(false, true); // green on
+      chain_servo_state(true);
+      break;
+    }
+    case State::STOP_AT_INTERMEDIATE: {
+      set_esc_speed(encoder_count, INTERMEDIATE_ENCODER_COUNT, Direction::STOP);
+      buzzer_state(true);
+      neopixel_state(true, false); // red on
+      chain_servo_state(true);
+      break;
+    }
+    case State::END: {
+      set_esc_speed(encoder_count, MIN_ENCODER_COUNT, Direction::STOP);
+      buzzer_state(false);
+      neopixel_state(false, false);
+      chain_servo_state(true);
       break;
     }
     case default: {
