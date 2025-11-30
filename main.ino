@@ -1,3 +1,4 @@
+#include <Adafruit_NeoPixel.h>
 #include <Encoder.h>
 #include <Servo.h>
 
@@ -22,11 +23,17 @@ const int ENCODER_PIN_B = 3;
 const int START_BUTTON_PIN = 4;
 const int TOP_LIMIT_SWITCH_PIN = 5;
 
+// buzzer
+const int BUZZER_PIN = 13;
+
+// led
+const int LED_PIN = 12;
+
 // -----
 // Consts
 // -----
 
-// Time constants (in milliseconds)
+// time (in milliseconds)
 const int TIME_STOPPED_AT_TOP = 15000;
 const int TIME_STOPPED_AT_BOTTOM = 5000;
 const int TIME_STOPPED_AT_INTERMEDIATE = 5000;
@@ -55,6 +62,13 @@ const int MIN_SPEED = (MAX_THROTTLE - NEUTRAL_THROTTLE) * 0.1; // 10% of max spe
 const int MIN_FORWARD_SPEED = NEUTRAL_THROTTLE + MIN_SPEED;
 const int MIN_REVERSE_SPEED = NEUTRAL_THROTTLE - MIN_SPEED; 
 
+// led
+const int NUM_RED_LEDS = 1;
+const int NUM_GREEN_LEDS = 1;
+const uint32_t RED = pixels.Color(255, 0, 0);
+const uint32_t GREEN = pixels.Color(0, 255, 0);
+const uint32_t OFF = pixels.Color(0, 0, 0);
+
 enum class State {
   START,
   CLIMB_TO_TOP,
@@ -77,6 +91,8 @@ State current_state = State::START;
 
 Encoder encoder_wheel(ENCODER_PIN_A, ENCODER_PIN_B);
 Servo esc;
+Adafruit_NeoPixel pixels(NUM_PIXELS, LED_PIN, NEO_GRB + NEO_KHZ800);
+
 
 void setup() {
   Serial.begin(9600);
@@ -170,6 +186,24 @@ void buzzer_state(bool buzzer_on) {
     return;
   }
   noTone(BUZZER_PIN);
+}
+
+void neopixel_state(bool red_on, bool green_on) {
+  for (int i = 0; i < NUM_RED_LEDS; i++) {
+    if (red_on) {
+      pixels.setPixelColor(i, RED);
+    } else {
+      pixels.setPixelColor(i, OFF);
+    }
+  }
+  for (int i = NUM_RED_LEDS; i < NUM_RED_LEDS + NUM_GREEN_LEDS; i++) {
+    if (green_on) {
+      pixels.setPixelColor(i, GREEN);
+    } else {
+      pixels.setPixelColor(i, OFF);
+    }
+  }
+  pixels.show();
 }
 
 // -----
