@@ -1,0 +1,258 @@
+#include <Encoder.h>
+#include <Servo.h>
+
+// -----
+// Config
+// -----
+
+bool START_BUTTON_RESETS = false;
+
+// -----
+// Pins
+// -----
+
+// esc
+const int ESC_PIN = 11; // 3, 5, 6, 9, 10, and 11 all should work
+
+// encoder
+const int ENCODER_PIN_A = 2;
+const int ENCODER_PIN_B = 3;
+
+// buttons
+const int START_BUTTON_PIN = 4;
+const int TOP_LIMIT_SWITCH_PIN = 5;
+
+// -----
+// Consts
+// -----
+
+// Time constants (in milliseconds)
+const int TIME_STOPPED_AT_TOP = 15000;
+const int TIME_STOPPED_AT_BOTTOM = 5000;
+const int TIME_STOPPED_AT_INTERMEDIATE = 5000;
+
+// esc
+const int MAX_THROTTLE = 2000;
+const int NEUTRAL_THROTTLE = 1500;
+const int MIN_THROTTLE = 1000;
+
+// tracking wheel distances in millimeters
+const int TOP_DISTANCE = 1800;
+const int INTERMEDIATE_DISTANCE = 900;
+const int WHEEL_RADIUS = 100;
+
+// tracking wheel encoder counts
+const int MIN_ENCODER_COUNT = 0;
+const int ENCODER_COUNTS_PER_REV = 1400;
+// const int TOP_ENCODER_COUNT = (TOP_DISTANCE / (WHEEL_RADIUS * 2 * 3.14159)) * ENCODER_COUNTS_PER_REV;
+// const int INTERMEDIATE_ENCODER_COUNT = (INTERMEDIATE_DISTANCE / (WHEEL_RADIUS * 2 * 3.14159)) * ENCODER_COUNTS_PER_REV;;
+const int TOP_ENCODER_COUNT = 1000;
+const int INTERMEDIATE_ENCODER_COUNT = 500;
+
+// "pid" constants
+const float SLOWDOWN_THRESHOLD = 0.5;
+const int MIN_SPEED = (MAX_THROTTLE - NEUTRAL_THROTTLE) * 0.1; // 10% of max speed
+const int MIN_FORWARD_SPEED = NEUTRAL_THROTTLE + MIN_SPEED;
+const int MIN_REVERSE_SPEED = NEUTRAL_THROTTLE - MIN_SPEED; 
+
+enum class State {
+  START,
+  CLIMB_TO_TOP,
+  STOP_AT_TOP,
+  RETURN_TO_BOTTOM,
+  STOP_AT_BOTTOM,
+  CLIMB_TO_INTERMEDIATE,
+  STOP_AT_INTERMEDIATE,
+  END
+}
+
+enum class Direction {
+  FORWARD,
+  REVERSE,
+  STOP
+};
+
+// Global variables and interfaces
+State current_state = State::START;
+
+Encoder encoder_wheel(ENCODER_PIN_A, ENCODER_PIN_B);
+Servo esc;
+
+void setup() {
+  Serial.begin(9600);
+  Serial.println("Main system start");
+
+  pinMode(START_BUTTON_PIN, INPUT_PULLUP);
+
+  pinMode(TOP_LIMIT_SWITCH_PIN, INPUT_PULLUP);
+
+  esc_arming_sequence();
+  Serial.println(">>> ESC arming complete <<<");
+
+  encoder_wheel.write(MIN_ENCODER_COUNT);
+  Serial.println("Encoder reset to 0");
+}
+
+unsigned long time_of_last_state_change = 0;
+
+void loop() {
+  // Read the sensor and timing values
+
+  // Time
+  const long current_time = millis();
+  const long time_from_last_state_change = current_time - time_of_last_state_change;
+  time_of_last_state_change = current_time;
+
+  // Buttons
+  const bool start_button_pressed = digitalRead(START_BUTTON_PIN) == LOW;
+  const bool top_limit_switch_triggered = digitalRead(TOP_LIMIT_SWITCH_PIN) == LOW;
+
+  // Encoder
+  const long encoder_count = encoder_wheel.read();
+
+  // Call the state determination function
+  determine_state(start_button_pressed, top_limit_switch_triggered, encoder_count, time_from_last_state_change);
+}
+
+// -----
+// Drivers
+// -----
+
+// arms esc
+void esc_arming_sequence() {
+  Serial.println(">>> ESC arming begin <<<");
+  Serial.println("Manually setting ESC pin to 0");
+  pinMode(ESC_PIN, OUTPUT);
+  digitalWrite(ESC_PIN, LOW);
+  delay(1000);
+  esc.attach(ESC_PIN, MIN_THROTTLE, MAX_THROTTLE);
+
+  Serial.println("Sending neutral signal to arm ESC");
+  esc.writeMicroseconds(NEUTRAL_THROTTLE);
+
+  delay(3000); 
+}
+
+// Maps encoder count to how fast to run the BLDC
+// Slows down as it approaches the target position and is past the threshold
+void set_esc_speed(long encoder_count, long target, Direction direction) {
+  if (direction == Direction::FORWARD) {
+    const long slowdown_threshold_ticks = SLOWDOWN_THRESHOLD * (target - MIN_ENCODER_COUNT) + MIN_ENCODER_COUNT;
+    if (encoder_count < slowdown_threshold_ticks) {
+      esc.writeMicroseconds(MAX_THROTTLE);
+    }
+
+    int pwm = map(encoder_count, slowdown_threshold_ticks, target, MAX_THROTTLE, MIN_FORWARD_SPEED);
+    int safe_pwm = constrain(pwm, MIN_FORWARD_SPEED, MAX_THROTTLE);
+    esc.writeMicroseconds(safe_pwm);
+    return;
+  }
+
+  if (direction == Direction::REVERSE) {
+    const long slowdown_threshold_ticks_reverse = (1 - SLOWDOWN_THRESHOLD) * (target - MIN_ENCODER_COUNT) + MIN_ENCODER_COUNT;
+    if (encoder_count > slowdown_threshold_ticks_reverse) {
+      return esc.writeMicroseconds(MIN_THROTTLE);
+    }
+
+    int pwm = map(encoder_count, slowdown_threshold_ticks_reverse, MIN_ENCODER_COUNT, MIN_THROTTLE, MIN_REVERSE_SPEED);
+    int safe_pwm = constrain(pwm, MIN_THROTTLE, MIN_REVERSE_SPEED);
+    esc.writeMicroseconds(safe_pwm);
+    return;
+  }
+
+  esc.writeMicroseconds(NEUTRAL_THROTTLE);
+}
+
+// -----
+// State machine logic
+// -----
+
+// Based on the inputs and current state, determine the next state
+void determine_state(bool start_button_pressed, bool top_limit_switch_triggered, long encoder_count, int time_from_last_state_change) {
+  if (current_state != State::START && START_BUTTON_RESETS && start_button_pressed) {
+    current_state = State::START;
+    Serial.println(">>> Current State: not START, but start button pressed and reset config is on");
+    Serial.println(">>> Resetting to START state <<<");
+    return;
+  }
+  switch (current_state) {
+    case State::START: {
+      Serial.println(">>> Current State: START <<<");
+      bool go_to_next_stage = start_button_pressed;
+      if (go_to_next_stage) {
+        current_state = State::CLIMB_TO_TOP;
+        break;
+      }
+      Serial.println(">>> Staying in state: START <<<");
+      break;
+    }
+    case State::CLIMB_TO_TOP: {
+      Serial.println(">>> Current State: CLIMB_TO_TOP <<<");
+      bool go_to_next_stage = top_limit_switch_triggered;
+      if (go_to_next_stage) {
+        current_state = State::STOP_AT_TOP;
+        break;
+      }
+      Serial.println(">>> Staying in state: CLIMB_TO_TOP <<<");
+      break;
+    }
+    case State::STOP_AT_TOP: {
+      Serial.println(">>> Current State: STOP_AT_TOP <<<");
+      bool go_to_next_stage = time_from_last_state_change > TIME_STOPPED_AT_TOP;
+      if (go_to_next_stage) {
+        current_state = State::RETURN_TO_BOTTOM;
+        break;
+      }
+      Serial.println(">>> Staying in state: STOP_AT_TOP <<<");
+      break;
+    }
+    case State::RETURN_TO_BOTTOM: {
+      Serial.println(">>> Current State: RETURN_TO_BOTTOM <<<");
+      bool go_to_next_stage = encoder_count <= MIN_ENCODER_COUNT;
+      if (go_to_next_stage) {
+        current_state = State::STOP_AT_BOTTOM;
+        break;
+      }
+      Serial.println(">>> Staying in state: RETURN_TO_BOTTOM <<<");
+      break;
+    }
+    case State::STOP_AT_BOTTOM: {
+      Serial.println(">>> Current State: STOP_AT_BOTTOM <<<");
+      bool go_to_next_stage = time_from_last_state_change > TIME_STOPPED_AT_BOTTOM;
+      if (go_to_next_stage) {
+        current_state = State::CLIMB_TO_INTERMEDIATE;
+        break;
+      }
+      Serial.println(">>> Staying in state: STOP_AT_BOTTOM <<<");
+      break;
+    }
+    case State::CLIMB_TO_INTERMEDIATE: {
+      bool go_to_next_stage = encoder_count >= INTERMEDIATE_ENCODER_COUNT;
+      if (go_to_next_stage) {
+       current_state = State::STOP_AT_INTERMEDIATE;
+        break;
+      }
+      Serial.println(">>> Staying in state: CLIMB_TO_INTERMEDIATE <<<");
+      break
+    }
+    case State::STOP_AT_INTERMEDIATE: {
+      Serial.println(">>> Current State: STOP_AT_INTERMEDIATE <<<");
+      bool go_to_next_stage = time_from_last_state_change > TIME_STOPPED_AT_INTERMEDIATE;
+      if (go_to_next_stage) {
+        current_state = State::END;
+        break;
+      }
+      Serial.println(">>> Staying in state: STOP_AT_INTERMEDIATE <<<");
+      break;
+    }
+    case State::END: {
+      Serial.println(">>> Current State: END <<<");
+      Serial.println(">>> Staying in state: END <<<");
+      break;
+    }
+    case default: {
+      Serial.println("Error: Unknown state");
+      break;
+    }
+  }
+}
