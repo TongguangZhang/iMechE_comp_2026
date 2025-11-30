@@ -32,6 +32,15 @@ const int LED_PIN = 12;
 // chain servo
 const int SERVO_PIN = 6;
 
+
+// -----
+// Interfaces
+// -----
+Servo esc;
+Encoder encoder_wheel(ENCODER_PIN_A, ENCODER_PIN_B);
+Adafruit_NeoPixel pixels(NUM_PIXELS, LED_PIN, NEO_GRB + NEO_KHZ800);
+Servo chain_holder;
+
 // -----
 // Consts
 // -----
@@ -93,14 +102,12 @@ enum class Direction {
   STOP
 };
 
-// Global variables and interfaces
+// -----
+// Global variables
+// ----
 State current_state = State::START;
 
-Encoder encoder_wheel(ENCODER_PIN_A, ENCODER_PIN_B);
-Servo esc;
-Adafruit_NeoPixel pixels(NUM_PIXELS, LED_PIN, NEO_GRB + NEO_KHZ800);
-Servo chain_holder;
-
+// Setup code
 void setup() {
   Serial.begin(9600);
   Serial.println("Main system start");
@@ -126,6 +133,7 @@ void setup() {
 
 unsigned long time_of_last_state_change = 0;
 
+// Loop code
 void loop() {
   // Read the sensor and timing values
 
@@ -141,8 +149,9 @@ void loop() {
   // Encoder
   const long encoder_count = encoder_wheel.read();
 
-  // Call the state determination function
+  // Determine the state and perform actions
   determine_state(start_button_pressed, top_limit_switch_triggered, encoder_count, time_from_last_state_change);
+  action_at_state(encoder_count);
 }
 
 // -----
