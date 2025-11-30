@@ -37,8 +37,13 @@ const int SERVO_PIN = 6;
 // Interfaces
 // -----
 Servo esc;
+
 Encoder encoder_wheel(ENCODER_PIN_A, ENCODER_PIN_B);
-Adafruit_NeoPixel pixels(NUM_PIXELS, LED_PIN, NEO_GRB + NEO_KHZ800);
+
+const int NUM_RED_LEDS = 1;
+const int NUM_GREEN_LEDS = 1;
+Adafruit_NeoPixel pixels(NUM_RED_LEDS + NUM_GREEN_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
+
 Servo chain_holder;
 
 // -----
@@ -72,11 +77,9 @@ const int INTERMEDIATE_ENCODER_COUNT = 500;
 const float SLOWDOWN_THRESHOLD = 0.5;
 const int MIN_SPEED = (MAX_THROTTLE - NEUTRAL_THROTTLE) * 0.1; // 10% of max speed
 const int MIN_FORWARD_SPEED = NEUTRAL_THROTTLE + MIN_SPEED;
-const int MIN_REVERSE_SPEED = NEUTRAL_THROTTLE - MIN_SPEED; 
+const int MIN_REVERSE_SPEED = NEUTRAL_THROTTLE - MIN_SPEED;
 
 // led
-const int NUM_RED_LEDS = 1;
-const int NUM_GREEN_LEDS = 1;
 const uint32_t RED = pixels.Color(255, 0, 0);
 const uint32_t GREEN = pixels.Color(0, 255, 0);
 const uint32_t OFF = pixels.Color(0, 0, 0);
@@ -94,7 +97,7 @@ enum class State {
   CLIMB_TO_INTERMEDIATE,
   STOP_AT_INTERMEDIATE,
   END
-}
+};
 
 enum class Direction {
   FORWARD,
@@ -170,7 +173,7 @@ void esc_arming_sequence() {
   Serial.println("Sending neutral signal to arm ESC");
   esc.writeMicroseconds(NEUTRAL_THROTTLE);
 
-  delay(3000); 
+  delay(3000);
 }
 
 // Maps encoder count to how fast to run the BLDC
@@ -180,6 +183,7 @@ void set_esc_speed(long encoder_count, long target, Direction direction) {
     const long slowdown_threshold_ticks = SLOWDOWN_THRESHOLD * (target - MIN_ENCODER_COUNT) + MIN_ENCODER_COUNT;
     if (encoder_count < slowdown_threshold_ticks) {
       esc.writeMicroseconds(MAX_THROTTLE);
+      return;
     }
 
     int pwm = map(encoder_count, slowdown_threshold_ticks, target, MAX_THROTTLE, MIN_FORWARD_SPEED);
@@ -191,7 +195,8 @@ void set_esc_speed(long encoder_count, long target, Direction direction) {
   if (direction == Direction::REVERSE) {
     const long slowdown_threshold_ticks_reverse = (1 - SLOWDOWN_THRESHOLD) * (target - MIN_ENCODER_COUNT) + MIN_ENCODER_COUNT;
     if (encoder_count > slowdown_threshold_ticks_reverse) {
-      return esc.writeMicroseconds(MIN_THROTTLE);
+      esc.writeMicroseconds(MIN_THROTTLE);
+      return;
     }
 
     int pwm = map(encoder_count, slowdown_threshold_ticks_reverse, MIN_ENCODER_COUNT, MIN_THROTTLE, MIN_REVERSE_SPEED);
@@ -310,7 +315,7 @@ void determine_state(bool start_button_pressed, bool top_limit_switch_triggered,
         break;
       }
       Serial.println(">>> Staying in state: CLIMB_TO_INTERMEDIATE <<<");
-      break
+      break;
     }
     case State::STOP_AT_INTERMEDIATE: {
       Serial.println(">>> Current State: STOP_AT_INTERMEDIATE <<<");
@@ -327,7 +332,7 @@ void determine_state(bool start_button_pressed, bool top_limit_switch_triggered,
       Serial.println(">>> Staying in state: END <<<");
       break;
     }
-    case default: {
+    default: {
       Serial.println("Error: Unknown state");
       break;
     }
@@ -393,7 +398,7 @@ void action_at_state(long encoder_count) {
       chain_servo_state(true);
       break;
     }
-    case default: {
+    default: {
       Serial.println("Error: Unknown state");
       break;
     }
