@@ -29,6 +29,9 @@ const int BUZZER_PIN = 13;
 // led
 const int LED_PIN = 12;
 
+// chain servo
+const int SERVO_PIN = 6;
+
 // -----
 // Consts
 // -----
@@ -69,6 +72,10 @@ const uint32_t RED = pixels.Color(255, 0, 0);
 const uint32_t GREEN = pixels.Color(0, 255, 0);
 const uint32_t OFF = pixels.Color(0, 0, 0);
 
+// chain servo
+const int SERVO_OPEN_PWM = 500;
+const int SERVO_CLOSED_PWM = 2500;
+
 enum class State {
   START,
   CLIMB_TO_TOP,
@@ -92,7 +99,7 @@ State current_state = State::START;
 Encoder encoder_wheel(ENCODER_PIN_A, ENCODER_PIN_B);
 Servo esc;
 Adafruit_NeoPixel pixels(NUM_PIXELS, LED_PIN, NEO_GRB + NEO_KHZ800);
-
+Servo chain_holder;
 
 void setup() {
   Serial.begin(9600);
@@ -188,6 +195,7 @@ void buzzer_state(bool buzzer_on) {
   noTone(BUZZER_PIN);
 }
 
+// Turn green and red lights on or off
 void neopixel_state(bool red_on, bool green_on) {
   for (int i = 0; i < NUM_RED_LEDS; i++) {
     if (red_on) {
@@ -204,6 +212,15 @@ void neopixel_state(bool red_on, bool green_on) {
     }
   }
   pixels.show();
+}
+
+// Servo open or closed
+void chain_servo_state(bool open) {
+  if (open) {
+    chain_holder.write(SERVO_OPEN_PWM); // open position
+    return;
+  }
+  chain_holder.write(SERVO_CLOSED_PWM); // closed position
 }
 
 // -----
