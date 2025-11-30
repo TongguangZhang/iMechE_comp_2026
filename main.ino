@@ -163,6 +163,15 @@ void set_esc_speed(long encoder_count, long target, Direction direction) {
   esc.writeMicroseconds(NEUTRAL_THROTTLE);
 }
 
+// Turn on or off
+void buzzer_state(bool buzzer_on) {
+  if (buzzer_on) {
+    tone(BUZZER_PIN, 1000);
+    return;
+  }
+  noTone(BUZZER_PIN);
+}
+
 // -----
 // State machine logic
 // -----
