@@ -27,7 +27,7 @@ const int TOP_LIMIT_SWITCH_PIN = 5;
 const int BUZZER_PIN = 13;
 
 // led
-const int LED_PIN = 12;
+const int LED_PIN = 10;
 
 // chain servo
 const int SERVO_PIN = 6;
@@ -88,8 +88,8 @@ const uint32_t GREEN = pixels.Color(0, 255, 0);
 const uint32_t OFF = pixels.Color(0, 0, 0);
 
 // chain servo
-const int SERVO_OPEN_PWM = 500;
-const int SERVO_CLOSED_PWM = 2500;
+const int SERVO_OPEN_PWM = 1000;
+const int SERVO_CLOSED_PWM = 2000;
 
 enum class State {
   START,
@@ -131,6 +131,10 @@ void setup() {
 
   pinMode(BUZZER_PIN, OUTPUT);
   Serial.println("Buzzer pin initialized");
+
+  chain_holder.attach(SERVO_PIN, SERVO_OPEN_PWM, SERVO_CLOSED_PWM);
+  chain_holder.write(SERVO_CLOSED_PWM);
+  Serial.println("Chain servo attachced");
 
   pixels.begin();
   pixels.setBrightness(10);
