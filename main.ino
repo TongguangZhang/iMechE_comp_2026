@@ -40,8 +40,8 @@ Servo esc;
 
 Encoder encoder_wheel(ENCODER_PIN_A, ENCODER_PIN_B);
 
-const int NUM_RED_LEDS = 1;
-const int NUM_GREEN_LEDS = 1;
+const int NUM_RED_LEDS = 2;
+const int NUM_GREEN_LEDS = 3;
 Adafruit_NeoPixel pixels(NUM_RED_LEDS + NUM_GREEN_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
 
 Servo chain_holder;
@@ -139,18 +139,29 @@ unsigned long time_of_last_state_change = 0;
 // Loop code
 void loop() {
   // Read the sensor and timing values
+  Serial.println("--- Reading sensors ---");
 
   // Time
   const long current_time = millis();
   const long time_from_last_state_change = current_time - time_of_last_state_change;
   time_of_last_state_change = current_time;
+  Serial.print("Time since last state change: ");
+  Serial.println(time_from_last_state_change);
 
   // Buttons
   const bool start_button_pressed = digitalRead(START_BUTTON_PIN) == LOW;
   const bool top_limit_switch_triggered = digitalRead(TOP_LIMIT_SWITCH_PIN) == LOW;
+  Serial.print("Start button pressed: ");
+  Serial.println(start_button_pressed ? "YES" : "NO");
+  Serial.print("Top limit switch triggered: ");
+  Serial.println(top_limit_switch_triggered ? "YES" : "NO");
 
   // Encoder
   const long encoder_count = encoder_wheel.read();
+  Serial.print("Encoder count: ");
+  Serial.println(encoder_count);
+
+  Serial.println("--- Sensors read complete ---");
 
   // Determine the state and perform actions
   determine_state(start_button_pressed, top_limit_switch_triggered, encoder_count, time_from_last_state_change);
