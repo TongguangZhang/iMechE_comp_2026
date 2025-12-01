@@ -109,6 +109,7 @@ enum class Direction {
 // Global variables
 // ----
 State current_state = State::START;
+unsigned long time_of_last_state_change = 0;
 
 // Setup code
 void setup() {
@@ -133,8 +134,6 @@ void setup() {
   pixels.show();
   Serial.println("Neopixel initialization");
 }
-
-unsigned long time_of_last_state_change = 0;
 
 // Loop code
 void loop() {
@@ -164,7 +163,12 @@ void loop() {
   Serial.println("--- Sensors read complete ---");
 
   // Determine the state and perform actions
-  determine_state(start_button_pressed, top_limit_switch_triggered, encoder_count, time_from_last_state_change);
+  State new_state = determine_state(start_button_pressed, top_limit_switch_triggered, encoder_count, time_from_last_state_change);
+  if (new_state != current_state) {
+    Serial.print(">>> State changed <<<");
+    current_state = new_state;
+    time_of_last_state_change = current_time;
+  }
   Serial.println("--- State determined ---");
   action_at_state(encoder_count);
   Serial.println("--- State actions performed ---");
@@ -263,21 +267,19 @@ void chain_servo_state(bool open) {
 // -----
 
 // Based on the inputs and current state, determine the next state
-void determine_state(bool start_button_pressed, bool top_limit_switch_triggered, long encoder_count, int time_from_last_state_change) {
+State determine_state(bool start_button_pressed, bool top_limit_switch_triggered, long encoder_count, int time_from_last_state_change) {
   Serial.println("--- Determining state ---");
   if (current_state != State::START && START_BUTTON_RESETS && start_button_pressed) {
-    current_state = State::START;
     Serial.println(">>> Current State: not START, but start button pressed and reset config is on");
     Serial.println(">>> Resetting to START state <<<");
-    return;
+    return State::START;
   }
   switch (current_state) {
     case State::START: {
       Serial.println(">>> Current State: START <<<");
       bool go_to_next_stage = start_button_pressed;
       if (go_to_next_stage) {
-        current_state = State::CLIMB_TO_TOP;
-        break;
+        return State::CLIMB_TO_TOP;
       }
       Serial.println(">>> Staying in state: START <<<");
       break;
@@ -286,8 +288,7 @@ void determine_state(bool start_button_pressed, bool top_limit_switch_triggered,
       Serial.println(">>> Current State: CLIMB_TO_TOP <<<");
       bool go_to_next_stage = top_limit_switch_triggered;
       if (go_to_next_stage) {
-        current_state = State::STOP_AT_TOP;
-        break;
+        return State::STOP_AT_TOP;
       }
       Serial.println(">>> Staying in state: CLIMB_TO_TOP <<<");
       break;
@@ -296,8 +297,7 @@ void determine_state(bool start_button_pressed, bool top_limit_switch_triggered,
       Serial.println(">>> Current State: STOP_AT_TOP <<<");
       bool go_to_next_stage = time_from_last_state_change > TIME_STOPPED_AT_TOP;
       if (go_to_next_stage) {
-        current_state = State::RETURN_TO_BOTTOM;
-        break;
+        return State::RETURN_TO_BOTTOM;
       }
       Serial.println(">>> Staying in state: STOP_AT_TOP <<<");
       break;
@@ -306,8 +306,7 @@ void determine_state(bool start_button_pressed, bool top_limit_switch_triggered,
       Serial.println(">>> Current State: RETURN_TO_BOTTOM <<<");
       bool go_to_next_stage = encoder_count <= MIN_ENCODER_COUNT;
       if (go_to_next_stage) {
-        current_state = State::STOP_AT_BOTTOM;
-        break;
+        return State::STOP_AT_BOTTOM;
       }
       Serial.println(">>> Staying in state: RETURN_TO_BOTTOM <<<");
       break;
@@ -316,8 +315,7 @@ void determine_state(bool start_button_pressed, bool top_limit_switch_triggered,
       Serial.println(">>> Current State: STOP_AT_BOTTOM <<<");
       bool go_to_next_stage = time_from_last_state_change > TIME_STOPPED_AT_BOTTOM;
       if (go_to_next_stage) {
-        current_state = State::CLIMB_TO_INTERMEDIATE;
-        break;
+        return State::CLIMB_TO_INTERMEDIATE;
       }
       Serial.println(">>> Staying in state: STOP_AT_BOTTOM <<<");
       break;
@@ -325,8 +323,7 @@ void determine_state(bool start_button_pressed, bool top_limit_switch_triggered,
     case State::CLIMB_TO_INTERMEDIATE: {
       bool go_to_next_stage = encoder_count >= INTERMEDIATE_ENCODER_COUNT;
       if (go_to_next_stage) {
-       current_state = State::STOP_AT_INTERMEDIATE;
-        break;
+        return State::STOP_AT_INTERMEDIATE;
       }
       Serial.println(">>> Staying in state: CLIMB_TO_INTERMEDIATE <<<");
       break;
@@ -335,8 +332,7 @@ void determine_state(bool start_button_pressed, bool top_limit_switch_triggered,
       Serial.println(">>> Current State: STOP_AT_INTERMEDIATE <<<");
       bool go_to_next_stage = time_from_last_state_change > TIME_STOPPED_AT_INTERMEDIATE;
       if (go_to_next_stage) {
-        current_state = State::END;
-        break;
+        return State::END;
       }
       Serial.println(">>> Staying in state: STOP_AT_INTERMEDIATE <<<");
       break;
@@ -351,6 +347,7 @@ void determine_state(bool start_button_pressed, bool top_limit_switch_triggered,
       break;
     }
   }
+  return current_state;
 }
 
 // Based on the current state, perform the appropriate actions for the actuators
