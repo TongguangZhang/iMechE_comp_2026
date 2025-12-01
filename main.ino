@@ -51,9 +51,9 @@ Servo chain_holder;
 // -----
 
 // time (in milliseconds)
-const int TIME_STOPPED_AT_TOP = 15000;
-const int TIME_STOPPED_AT_BOTTOM = 5000;
-const int TIME_STOPPED_AT_INTERMEDIATE = 5000;
+const int TIME_STOPPED_AT_TOP = 12000;
+const int TIME_STOPPED_AT_BOTTOM = 4000;
+const int TIME_STOPPED_AT_INTERMEDIATE = 3000;
 
 // esc
 const int MAX_THROTTLE = 2000;
@@ -75,7 +75,7 @@ const int INTERMEDIATE_ENCODER_COUNT = 500;
 
 // "pid" constants
 const float SLOWDOWN_THRESHOLD = 0.5;
-const int MIN_SPEED = (MAX_THROTTLE - NEUTRAL_THROTTLE) * 0.1; // 10% of max speed
+const int MIN_SPEED = 60; // 10% of max speed
 const int MIN_FORWARD_SPEED = NEUTRAL_THROTTLE + MIN_SPEED;
 const int MIN_REVERSE_SPEED = NEUTRAL_THROTTLE - MIN_SPEED;
 const int MAX_FORWARD_SPEED = NEUTRAL_THROTTLE + 150;
