@@ -154,7 +154,9 @@ void loop() {
 
   // Determine the state and perform actions
   determine_state(start_button_pressed, top_limit_switch_triggered, encoder_count, time_from_last_state_change);
+  Serial.println("--- State determined ---");
   action_at_state(encoder_count);
+  Serial.println("--- State actions performed ---");
 }
 
 // -----
@@ -251,6 +253,7 @@ void chain_servo_state(bool open) {
 
 // Based on the inputs and current state, determine the next state
 void determine_state(bool start_button_pressed, bool top_limit_switch_triggered, long encoder_count, int time_from_last_state_change) {
+  Serial.println("--- Determining state ---");
   if (current_state != State::START && START_BUTTON_RESETS && start_button_pressed) {
     current_state = State::START;
     Serial.println(">>> Current State: not START, but start button pressed and reset config is on");
@@ -341,8 +344,10 @@ void determine_state(bool start_button_pressed, bool top_limit_switch_triggered,
 
 // Based on the current state, perform the appropriate actions for the actuators
 void action_at_state(long encoder_count) {
+  Serial.println("--- State actions ---");
   switch (current_state) {
     case State::START: {
+      Serial.println(">>> Current State: START <<<");
       set_esc_speed(encoder_count, MIN_ENCODER_COUNT, Direction::STOP);
       buzzer_state(false);
       neopixel_state(false, false);
@@ -350,6 +355,7 @@ void action_at_state(long encoder_count) {
       break;
     }
     case State::CLIMB_TO_TOP: {
+      Serial.println(">>> Current State: CLIMB_TO_TOP <<<");
       set_esc_speed(encoder_count, TOP_ENCODER_COUNT, Direction::FORWARD);
       buzzer_state(false);
       neopixel_state(false, true); // green on
@@ -357,6 +363,7 @@ void action_at_state(long encoder_count) {
       break;
     }
     case State::STOP_AT_TOP: {
+      Serial.println(">>> Current State: STOP_AT_TOP <<<");
       set_esc_speed(encoder_count, TOP_ENCODER_COUNT, Direction::STOP);
       buzzer_state(true);
       neopixel_state(true, false); // red on
@@ -364,6 +371,7 @@ void action_at_state(long encoder_count) {
       break;
     }
     case State::RETURN_TO_BOTTOM: {
+      Serial.println(">>> Current State: RETURN_TO_BOTTOM <<<");
       set_esc_speed(encoder_count, MIN_ENCODER_COUNT, Direction::REVERSE);
       buzzer_state(false);
       neopixel_state(false, true); // green on
@@ -371,6 +379,7 @@ void action_at_state(long encoder_count) {
       break;
     }
     case State::STOP_AT_BOTTOM: {
+      Serial.println(">>> Current State: STOP_AT_BOTTOM <<<");
       set_esc_speed(encoder_count, MIN_ENCODER_COUNT, Direction::STOP);
       buzzer_state(true);
       neopixel_state(true, false); // red on
@@ -378,6 +387,7 @@ void action_at_state(long encoder_count) {
       break;
     }
     case State::CLIMB_TO_INTERMEDIATE: {
+      Serial.println(">>> Current State: CLIMB_TO_INTERMEDIATE <<<");
       set_esc_speed(encoder_count, INTERMEDIATE_ENCODER_COUNT, Direction::FORWARD);
       buzzer_state(false);
       neopixel_state(false, true); // green on
@@ -385,6 +395,7 @@ void action_at_state(long encoder_count) {
       break;
     }
     case State::STOP_AT_INTERMEDIATE: {
+      Serial.println(">>> Current State: STOP_AT_INTERMEDIATE <<<");
       set_esc_speed(encoder_count, INTERMEDIATE_ENCODER_COUNT, Direction::STOP);
       buzzer_state(true);
       neopixel_state(true, false); // red on
@@ -392,6 +403,7 @@ void action_at_state(long encoder_count) {
       break;
     }
     case State::END: {
+      Serial.println(">>> Current State: END <<<");
       set_esc_speed(encoder_count, MIN_ENCODER_COUNT, Direction::STOP);
       buzzer_state(false);
       neopixel_state(false, false);
