@@ -78,6 +78,9 @@ const float SLOWDOWN_THRESHOLD = 0.5;
 const int MIN_SPEED = (MAX_THROTTLE - NEUTRAL_THROTTLE) * 0.1; // 10% of max speed
 const int MIN_FORWARD_SPEED = NEUTRAL_THROTTLE + MIN_SPEED;
 const int MIN_REVERSE_SPEED = NEUTRAL_THROTTLE - MIN_SPEED;
+const int MAX_FORWARD_SPEED = NEUTRAL_THROTTLE + 150;
+const int MAX_REVERSE_SPEED = NEUTRAL_THROTTLE - 150;
+const int RAMP_UP_TIME = 3000;
 
 // led
 const uint32_t RED = pixels.Color(255, 0, 0);
@@ -198,16 +201,23 @@ void esc_arming_sequence() {
 
 // Maps encoder count to how fast to run the BLDC
 // Slows down as it approaches the target position and is past the threshold
-void set_esc_speed(long encoder_count, long target, Direction direction) {
+void set_esc_speed(long encoder_count, long target, Direction direction, int time_from_last_state_change) {
   if (direction == Direction::FORWARD) {
     const long slowdown_threshold_ticks = SLOWDOWN_THRESHOLD * (target - MIN_ENCODER_COUNT) + MIN_ENCODER_COUNT;
     if (encoder_count < slowdown_threshold_ticks) {
-      esc.writeMicroseconds(MAX_THROTTLE);
+      // Ramp to max speed
+      if (time_from_last_state_change < RAMP_UP_TIME) {
+        int pwm = map(time_from_last_state_change, 0, RAMP_UP_TIME, NEUTRAL_THROTTLE, MAX_FORWARD_SPEED);
+        int safe_pwm = constrain(pwm, NEUTRAL_THROTTLE, MAX_FORWARD_SPEED);
+        esc.writeMicroseconds(safe_pwm);
+        return;
+      }
+      esc.writeMicroseconds(MAX_FORWARD_SPEED);
       return;
     }
 
-    int pwm = map(encoder_count, slowdown_threshold_ticks, target, MAX_THROTTLE, MIN_FORWARD_SPEED);
-    int safe_pwm = constrain(pwm, MIN_FORWARD_SPEED, MAX_THROTTLE);
+    int pwm = map(encoder_count, slowdown_threshold_ticks, target, MAX_FORWARD_SPEED, MIN_FORWARD_SPEED);
+    int safe_pwm = constrain(pwm, MIN_FORWARD_SPEED, MAX_FORWARD_SPEED);
     esc.writeMicroseconds(safe_pwm);
     return;
   }
@@ -215,12 +225,19 @@ void set_esc_speed(long encoder_count, long target, Direction direction) {
   if (direction == Direction::REVERSE) {
     const long slowdown_threshold_ticks_reverse = (1 - SLOWDOWN_THRESHOLD) * (target - MIN_ENCODER_COUNT) + MIN_ENCODER_COUNT;
     if (encoder_count > slowdown_threshold_ticks_reverse) {
-      esc.writeMicroseconds(MIN_THROTTLE);
+      // Ramp to max speed
+      if (time_from_last_state_change < RAMP_UP_TIME) {
+        int pwm = map(time_from_last_state_change, 0, RAMP_UP_TIME, NEUTRAL_THROTTLE, MAX_REVERSE_SPEED);
+        int safe_pwm = constrain(pwm, MAX_REVERSE_SPEED, NEUTRAL_THROTTLE);
+        esc.writeMicroseconds(safe_pwm);
+        return;
+      }
+      esc.writeMicroseconds(MAX_REVERSE_SPEED);
       return;
     }
 
-    int pwm = map(encoder_count, slowdown_threshold_ticks_reverse, MIN_ENCODER_COUNT, MIN_THROTTLE, MIN_REVERSE_SPEED);
-    int safe_pwm = constrain(pwm, MIN_THROTTLE, MIN_REVERSE_SPEED);
+    int pwm = map(encoder_count, slowdown_threshold_ticks_reverse, MIN_ENCODER_COUNT, MAX_REVERSE_SPEED, MIN_REVERSE_SPEED);
+    int safe_pwm = constrain(pwm, MAX_REVERSE_SPEED, MIN_REVERSE_SPEED);
     esc.writeMicroseconds(safe_pwm);
     return;
   }
