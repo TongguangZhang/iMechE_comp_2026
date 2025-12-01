@@ -143,9 +143,12 @@ void loop() {
   // Time
   const long current_time = millis();
   const long time_from_last_state_change = current_time - time_of_last_state_change;
-  time_of_last_state_change = current_time;
-  Serial.print("Time since last state change: ");
-  Serial.println(time_from_last_state_change);
+  Serial.print("time from last state change: ");
+  Serial.print(time_from_last_state_change);
+  Serial.print(" | current time: ");
+  Serial.print(current_time);
+  Serial.print(" | time of last state change: ");
+  Serial.println(time_of_last_state_change);
 
   // Buttons
   const bool start_button_pressed = digitalRead(START_BUTTON_PIN) == LOW;
