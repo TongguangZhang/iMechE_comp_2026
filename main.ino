@@ -149,7 +149,7 @@ void loop() {
 
   // Time
   const long current_time = millis();
-  const long time_from_last_state_change = current_time - time_of_last_state_change;
+  long time_from_last_state_change = current_time - time_of_last_state_change;
   Serial.print("time from last state change: ");
   Serial.print(time_from_last_state_change);
   Serial.print(" | current time: ");
@@ -178,9 +178,10 @@ void loop() {
     Serial.print(">>> State changed <<<");
     current_state = new_state;
     time_of_last_state_change = current_time;
+    time_from_last_state_change = 0;
   }
   Serial.println("--- State determined ---");
-  action_at_state(encoder_count);
+  action_at_state(encoder_count, time_from_last_state_change);
   Serial.println("--- State actions performed ---");
 }
 
@@ -205,7 +206,12 @@ void esc_arming_sequence() {
 
 // Maps encoder count to how fast to run the BLDC
 // Slows down as it approaches the target position and is past the threshold
-void set_esc_speed(long encoder_count, long target, Direction direction, int time_from_last_state_change) {
+void set_esc_speed(long encoder_count, long target, Direction direction, long time_from_last_state_change) {
+  Serial.println(">>> Setting ESC speed <<<");
+  Serial.print("Encoder count: ");
+  Serial.print(encoder_count);
+  Serial.print(" | Time from last state change: ");
+  Serial.println(time_from_last_state_change);
   if (direction == Direction::FORWARD) {
     const long slowdown_threshold_ticks = SLOWDOWN_THRESHOLD * (target - MIN_ENCODER_COUNT) + MIN_ENCODER_COUNT;
     if (encoder_count < slowdown_threshold_ticks) {
@@ -291,7 +297,7 @@ void chain_servo_state(bool open) {
 // -----
 
 // Based on the inputs and current state, determine the next state
-State determine_state(bool start_button_pressed, bool top_limit_switch_triggered, long encoder_count, int time_from_last_state_change) {
+State determine_state(bool start_button_pressed, bool top_limit_switch_triggered, long encoder_count, long time_from_last_state_change) {
   Serial.println("--- Determining state ---");
   if (current_state != State::START && START_BUTTON_RESETS && start_button_pressed) {
     Serial.println(">>> Current State: not START, but start button pressed and reset config is on");
@@ -375,12 +381,12 @@ State determine_state(bool start_button_pressed, bool top_limit_switch_triggered
 }
 
 // Based on the current state, perform the appropriate actions for the actuators
-void action_at_state(long encoder_count) {
+void action_at_state(long encoder_count, long time_from_last_state_change) {
   Serial.println("--- State actions ---");
   switch (current_state) {
     case State::START: {
       Serial.println(">>> Current State: START <<<");
-      set_esc_speed(encoder_count, MIN_ENCODER_COUNT, Direction::STOP);
+      set_esc_speed(encoder_count, MIN_ENCODER_COUNT, Direction::STOP, time_from_last_state_change);
       buzzer_state(false);
       neopixel_state(false, false);
       chain_servo_state(false);
@@ -388,7 +394,7 @@ void action_at_state(long encoder_count) {
     }
     case State::CLIMB_TO_TOP: {
       Serial.println(">>> Current State: CLIMB_TO_TOP <<<");
-      set_esc_speed(encoder_count, TOP_ENCODER_COUNT, Direction::FORWARD);
+      set_esc_speed(encoder_count, TOP_ENCODER_COUNT, Direction::FORWARD, time_from_last_state_change);
       buzzer_state(false);
       neopixel_state(false, true); // green on
       chain_servo_state(false);
@@ -396,7 +402,7 @@ void action_at_state(long encoder_count) {
     }
     case State::STOP_AT_TOP: {
       Serial.println(">>> Current State: STOP_AT_TOP <<<");
-      set_esc_speed(encoder_count, TOP_ENCODER_COUNT, Direction::STOP);
+      set_esc_speed(encoder_count, TOP_ENCODER_COUNT, Direction::STOP, time_from_last_state_change);
       buzzer_state(true);
       neopixel_state(true, false); // red on
       chain_servo_state(false);
@@ -404,7 +410,7 @@ void action_at_state(long encoder_count) {
     }
     case State::RETURN_TO_BOTTOM: {
       Serial.println(">>> Current State: RETURN_TO_BOTTOM <<<");
-      set_esc_speed(encoder_count, MIN_ENCODER_COUNT, Direction::REVERSE);
+      set_esc_speed(encoder_count, MIN_ENCODER_COUNT, Direction::REVERSE, time_from_last_state_change);
       buzzer_state(false);
       neopixel_state(false, true); // green on
       chain_servo_state(false);
@@ -412,7 +418,7 @@ void action_at_state(long encoder_count) {
     }
     case State::STOP_AT_BOTTOM: {
       Serial.println(">>> Current State: STOP_AT_BOTTOM <<<");
-      set_esc_speed(encoder_count, MIN_ENCODER_COUNT, Direction::STOP);
+      set_esc_speed(encoder_count, MIN_ENCODER_COUNT, Direction::STOP, time_from_last_state_change);
       buzzer_state(true);
       neopixel_state(true, false); // red on
       chain_servo_state(false);
@@ -420,7 +426,7 @@ void action_at_state(long encoder_count) {
     }
     case State::CLIMB_TO_INTERMEDIATE: {
       Serial.println(">>> Current State: CLIMB_TO_INTERMEDIATE <<<");
-      set_esc_speed(encoder_count, INTERMEDIATE_ENCODER_COUNT, Direction::FORWARD);
+      set_esc_speed(encoder_count, INTERMEDIATE_ENCODER_COUNT, Direction::FORWARD, time_from_last_state_change);
       buzzer_state(false);
       neopixel_state(false, true); // green on
       chain_servo_state(true);
@@ -428,7 +434,7 @@ void action_at_state(long encoder_count) {
     }
     case State::STOP_AT_INTERMEDIATE: {
       Serial.println(">>> Current State: STOP_AT_INTERMEDIATE <<<");
-      set_esc_speed(encoder_count, INTERMEDIATE_ENCODER_COUNT, Direction::STOP);
+      set_esc_speed(encoder_count, INTERMEDIATE_ENCODER_COUNT, Direction::STOP, time_from_last_state_change);
       buzzer_state(true);
       neopixel_state(true, false); // red on
       chain_servo_state(true);
@@ -436,7 +442,7 @@ void action_at_state(long encoder_count) {
     }
     case State::END: {
       Serial.println(">>> Current State: END <<<");
-      set_esc_speed(encoder_count, MIN_ENCODER_COUNT, Direction::STOP);
+      set_esc_speed(encoder_count, MIN_ENCODER_COUNT, Direction::STOP, time_from_last_state_change);
       buzzer_state(false);
       neopixel_state(false, false);
       chain_servo_state(true);
